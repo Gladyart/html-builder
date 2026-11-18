@@ -17,7 +17,7 @@ const templates = {
 const previewCSS = `
 :root{--now-color_background--primary:#fff;--now-color_background--secondary:#f1f5f9;--now-color_text--primary:#1f2937;--now-color_text--secondary:#64748b;--now-color_border--primary:#cbd5e1;--now-color_link--primary:#0f6cbd;--now-color_alert--warning-0:#fff7ed;--now-color_alert--warning-2:#f59e0b}
 :root[data-theme="dark"]{--now-color_background--primary:#1d2531;--now-color_background--secondary:#2b3543;--now-color_text--primary:#f1f5f9;--now-color_text--secondary:#b7c4d5;--now-color_border--primary:#64748b;--now-color_link--primary:#93c5fd;--now-color_alert--warning-0:#453522;--now-color_alert--warning-2:#fbbf24}
-*{box-sizing:border-box}body{margin:0;padding:26px;background:var(--now-color_background--primary);color:var(--now-color_text--primary);font:15px/1.6 Inter,"Segoe UI",Arial,sans-serif} .kb-page{max-width:980px;margin:auto;padding:18px;background:var(--now-color_background--primary);color:var(--now-color_text--primary)}h1{font-size:30px;line-height:1.2;margin:0 0 8px}h2{font-size:20px}h3{font-size:16px}.lede{color:var(--now-color_text--secondary);margin:0 0 24px}.kb-section{border:1px solid var(--now-color_border--primary);border-radius:12px;margin:12px 0 20px;overflow:hidden;background:var(--now-color_background--primary)}.kb-section>summary{padding:14px 18px;background:var(--now-color_background--secondary);border-bottom:1px solid var(--now-color_border--primary);font-weight:600;cursor:pointer}.section-body{padding:16px 18px}.resource-card,.license-box,.stacked-item{padding:14px 16px;border:1px solid var(--now-color_border--primary);border-radius:10px;background:var(--now-color_background--secondary);margin:10px 0}.callout{padding:12px 14px;border:1px solid var(--now-color_border--primary);border-radius:8px;margin:10px 0}.warning{background:var(--now-color_alert--warning-0);border-left:4px solid var(--now-color_alert--warning-2)}a{color:var(--now-color_link--primary)}.resource-desc,.muted{color:var(--now-color_text--secondary)}img{max-width:100%;height:auto}figure{margin:14px 0;padding:10px;border:1px dashed var(--now-color_border--primary)}[data-kb-selected="true"]{outline:2px solid #4f9cf9!important;outline-offset:2px} [data-kb-selected="true"]:empty{min-height:18px} [data-html-drop-target]{outline:3px dashed #2563eb!important;outline-offset:3px} `;
+*{box-sizing:border-box}body{margin:0;padding:26px;background:var(--now-color_background--primary);color:var(--now-color_text--primary);font:15px/1.6 Inter,"Segoe UI",Arial,sans-serif} .kb-page{max-width:980px;margin:auto;padding:18px;background:var(--now-color_background--primary);color:var(--now-color_text--primary)}h1{font-size:30px;line-height:1.2;margin:0 0 8px}h2{font-size:20px}h3{font-size:16px}.lede{color:var(--now-color_text--secondary);margin:0 0 24px}.kb-section{border:1px solid var(--now-color_border--primary);border-radius:12px;margin:12px 0 20px;overflow:hidden;background:var(--now-color_background--primary)}.kb-section>summary{padding:14px 18px;background:var(--now-color_background--secondary);border-bottom:1px solid var(--now-color_border--primary);font-weight:600;cursor:pointer}.section-body{padding:16px 18px}.resource-card,.license-box,.stacked-item{padding:14px 16px;border:1px solid var(--now-color_border--primary);border-radius:10px;background:var(--now-color_background--secondary);margin:10px 0}.callout{padding:12px 14px;border:1px solid var(--now-color_border--primary);border-radius:8px;margin:10px 0}.warning{background:var(--now-color_alert--warning-0);border-left:4px solid var(--now-color_alert--warning-2)}a{color:var(--now-color_link--primary)}.resource-desc,.muted{color:var(--now-color_text--secondary)}img{max-width:100%;height:auto}figure{margin:14px 0;padding:10px;border:1px dashed var(--now-color_border--primary)}[data-kb-selected="true"]{outline:3px solid #2563eb!important;outline-offset:2px;position:relative} body *:hover{outline-color:#93c5fd} [data-kb-selected="true"]:empty{min-height:18px} [data-html-drop-target]{outline:3px dashed #2563eb!important;outline-offset:3px} `;
 // Internal identities are held outside the article DOM and never exported.
 let elementIds = new WeakMap();
 let idCounter = 0;
@@ -36,6 +36,8 @@ let pendingSelectionId = null;
 let doc;
 let dragPayload = null;
 let previewDrop = null;
+let lastChildByParent = new WeakMap();
+const propertyGroupState = {general:true,layout:false,advanced:false};
 const textElements = new Set(['P','H1','H2','H3','H4','H5','H6','SPAN','STRONG','EM','LI','SUMMARY','A','FIGCAPTION']);
 const voidElements = new Set(['IMG','BR','HR','INPUT']);
 const inlineTags = new Set(['A','SPAN','STRONG','EM','B','I','U','SMALL','CODE']);
@@ -73,9 +75,10 @@ preview.addEventListener('load',()=>{
 function selectNode(node){
  if(!node || !doc?.body.contains(node))return;
  if(selected?.isConnected)selected.removeAttribute('data-kb-selected');
+ if(selected?.parentElement)lastChildByParent.set(selected.parentElement,selected);
  selected=node;internalId(node);
  if(selected!==doc.body)selected.setAttribute('data-kb-selected','true');
- renderTree();renderProperties();
+ renderTree();renderProperties();renderBreadcrumbs();updateNavigation();
 }
 function labelFor(el){let name=el.tagName.toLowerCase();if(el.className && typeof el.className==='string')name+='.'+el.className.trim().split(/\s+/).slice(0,2).join('.');const content=el.textContent?.trim().slice(0,28);return `${name}${content?' · '+content:''}`;}
 function renderTree(){
@@ -88,6 +91,30 @@ function renderTree(){
  draw(doc.body,tree,0);
 }
 function field(name,value,onChange,multiline=false){const wrap=document.createElement('div');wrap.className='field';const label=document.createElement('label');label.textContent=name;const input=document.createElement(multiline?'textarea':'input');input.value=value??'';input.addEventListener('change',()=>onChange(input.value));wrap.append(label,input);return wrap;}
+
+function renderBreadcrumbs(){
+ const bar=$('breadcrumbs');bar.replaceChildren();if(!doc||!selected)return;
+ const chain=[];let n=selected;
+ while(n && doc.body.contains(n)){chain.unshift(n);if(n===doc.body)break;n=n.parentElement;}
+ for(const [i,el] of chain.entries()){
+  if(i){const sep=document.createElement('span');sep.textContent='›';sep.className='crumb-separator';bar.append(sep);}
+  const btn=document.createElement('button');btn.className='crumb'+(el===selected?' active':'');
+  btn.textContent=el.tagName.toLowerCase()+(el.classList?.length?'.'+[...el.classList].slice(0,1).join(''):'');
+  btn.title='Select '+labelFor(el);btn.onclick=()=>selectNode(el);bar.append(btn);
+ }
+}
+function updateNavigation(){
+ $('parentBtn').disabled=!selected||selected===doc?.body;
+ $('childBtn').disabled=!selected||!selected.children.length;
+}
+function propertyGroup(box,key,title){
+ const group=document.createElement('details');group.className='property-section';group.open=propertyGroupState[key];
+ const summary=document.createElement('summary');summary.textContent=title;group.append(summary);
+ const content=document.createElement('div');content.className='property-section-content';group.append(content);
+ group.addEventListener('toggle',()=>{propertyGroupState[key]=group.open;});
+ box.append(group);return content;
+}
+
 function renderProperties(){
  const box=$('properties');box.replaceChildren();if(!selected)return;
  const el=selected;
@@ -95,35 +122,33 @@ function renderProperties(){
  const idLabel=document.createElement('div');idLabel.className='internal-id';idLabel.textContent=`Editor ID: ${internalId(el)} (not exported)`;
  box.append(meta,idLabel);
  if(el===doc.body){box.appendChild(document.createTextNode('Select an element to edit its properties.'));return;}
- const apply=(fn)=>{fn();markDirty();renderTree();renderProperties();};
- box.appendChild(field('HTML id attribute',el.id,v=>apply(()=>{if(v)el.id=v;else el.removeAttribute('id');})));
- box.appendChild(field('CSS classes',el.className, v=>apply(()=>el.className=v)));
- box.appendChild(field('Title / tooltip',el.getAttribute('title')||'',v=>apply(()=>{if(v)el.setAttribute('title',v);else el.removeAttribute('title');})));
- const styleGroup=document.createElement('div');styleGroup.className='property-group';styleGroup.textContent='Layout and spacing';box.appendChild(styleGroup);
- const styleField=(label,property)=>box.appendChild(field(label,el.style.getPropertyValue(property),v=>apply(()=>{if(v.trim())el.style.setProperty(property,v.trim());else el.style.removeProperty(property);} )));
- styleField('Display (block, flex, grid...)','display');
- styleField('Width (px, %, auto...)','width');
- styleField('Padding','padding');
- styleField('Margin','margin');
- styleField('Gap','gap');
- styleField('Text align','text-align');
- if(textElements.has(el.tagName)){
-  box.appendChild(field('Text',el.textContent,v=>apply(()=>{el.textContent=v;}),true));
- } else if(el.tagName==='IMG'){
-  box.appendChild(field('Image URL',el.getAttribute('src')||'',v=>apply(()=>{if(!/^\s*(javascript:|data:)/i.test(v))el.setAttribute('src',v);} )));
-  box.appendChild(field('Alt text',el.getAttribute('alt')||'',v=>apply(()=>el.setAttribute('alt',v))));
+ const apply=fn=>{fn();markDirty();renderTree();renderProperties();renderBreadcrumbs();};
+ const general=propertyGroup(box,'general','General properties');
+ general.appendChild(field('HTML id attribute',el.id,v=>apply(()=>{if(v)el.id=v;else el.removeAttribute('id');})));
+ general.appendChild(field('CSS classes',el.className,v=>apply(()=>el.className=v)));
+ general.appendChild(field('Title / tooltip',el.getAttribute('title')||'',v=>apply(()=>{if(v)el.setAttribute('title',v);else el.removeAttribute('title');})));
+ if(textElements.has(el.tagName))general.appendChild(field('Text',el.textContent,v=>apply(()=>{el.textContent=v;}),true));
+ else if(el.tagName==='IMG'){
+  general.appendChild(field('Image URL',el.getAttribute('src')||'',v=>apply(()=>{if(!/^\s*(javascript:|data:)/i.test(v))el.setAttribute('src',v);} )));
+  general.appendChild(field('Alt text',el.getAttribute('alt')||'',v=>apply(()=>el.setAttribute('alt',v))));
  }
- if(el.tagName==='A')box.appendChild(field('Link URL',el.getAttribute('href')||'',v=>apply(()=>{if(!/^\s*(javascript:|data:)/i.test(v))el.setAttribute('href',v);} )));
+ if(el.tagName==='A')general.appendChild(field('Link URL',el.getAttribute('href')||'',v=>apply(()=>{if(!/^\s*(javascript:|data:)/i.test(v))el.setAttribute('href',v);} )));
  if(el.tagName==='DETAILS'){
-  const row=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.checked=el.open;cb.onchange=()=>apply(()=>{el.open=cb.checked;});row.append(cb,' Open in preview');box.append(row);
+  const row=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.checked=el.open;cb.onchange=()=>apply(()=>{el.open=cb.checked;});row.append(cb,' Open in preview');general.append(row);
  }
- box.appendChild(field('Inline spacing / layout CSS',el.getAttribute('style')||'',v=>apply(()=>el.setAttribute('style',v)),true));
- box.appendChild(field('Element HTML (advanced)',el.outerHTML,v=>{
+ const layout=propertyGroup(box,'layout','Layout and spacing');
+ const styleField=(label,property)=>layout.appendChild(field(label,el.style.getPropertyValue(property),v=>apply(()=>{if(v.trim())el.style.setProperty(property,v.trim());else el.style.removeProperty(property);} )));
+ styleField('Display (block, flex, grid...)','display');styleField('Width (px, %, auto...)','width');
+ styleField('Padding','padding');styleField('Margin','margin');styleField('Gap','gap');styleField('Text align','text-align');
+ const advanced=propertyGroup(box,'advanced','Advanced CSS and HTML');
+ advanced.appendChild(field('Inline CSS',el.getAttribute('style')||'',v=>apply(()=>{if(v.trim())el.setAttribute('style',v);else el.removeAttribute('style');}),true));
+ advanced.appendChild(field('Element HTML',el.outerHTML,v=>{
   const fragment=doc.createElement('template');fragment.innerHTML=sanitize(v);const replacement=fragment.content.firstElementChild;
   if(!replacement){setStatus('Invalid HTML');return;}
   el.replaceWith(replacement);markDirty();selectNode(replacement);
  },true));
 }
+
 function addComponent(name){
  if(!doc)return;
  const template=doc.createElement('template');template.innerHTML=templates[name];const node=template.content.firstElementChild;if(!node)return;
@@ -277,6 +302,9 @@ $('newBtn').onclick=()=>{if(dirty&&!confirm('Discard unsaved changes?'))return;l
 $('openBtn').onclick=()=>importFile(false);$('projectBtn').onclick=()=>importFile(true);
 $('saveProjectBtn').onclick=()=>exportFile(true);$('exportBtn').onclick=()=>exportFile(false);
 $('theme').onchange=()=>{if(doc)doc.documentElement.dataset.theme=$('theme').value;};
+$('parentBtn').onclick=()=>{if(selected?.parentElement && doc.body.contains(selected.parentElement))selectNode(selected.parentElement);};
+$('childBtn').onclick=()=>{if(!selected)return;const last=lastChildByParent.get(selected);selectNode(last?.parentElement===selected?last:selected.firstElementChild);};
+$('zoom').onchange=()=>{const stage=$('preview-stage');stage.style.width=(10000/Number($('zoom').value))+'%';stage.style.height=(10000/Number($('zoom').value))+'%';stage.style.transform='scale('+Number($('zoom').value)/100+')';};
 $('refreshTreeBtn').onclick=renderTree;$('upBtn').onclick=()=>moveSelected(-1);$('downBtn').onclick=()=>moveSelected(1);$('duplicateBtn').onclick=cloneSelected;$('deleteBtn').onclick=deleteSelected;
 $('sourceBtn').onclick=openSource;$('closeSource').onclick=()=>$('sourceDialog').close();
 $('copySource').onclick=async()=>{await navigator.clipboard.writeText($('sourceText').value);setStatus('HTML copied');};

@@ -23,7 +23,7 @@ This is source code, not a compiled installer. Preview theme colors are simulate
 
 ## Version changes
 
-- Drag a component from the library to an element in the preview or document tree.
-- Drag a tree element to move it; drop at top/middle/bottom of a row to place before/inside/after.
-- In the preview, drag an element itself to move it (the clicked element becomes draggable).
-- Invalid parent/child combinations and moving elements into their descendants are blocked.
+- Click preview elements to select; use the breadcrumb trail to select any ancestor, including an accordion's DETAILS element.
+- Parent/Child navigation is available in the right sidebar.
+- Preview-only zoom: 75%, 90%, 100%, 110%, 125%, 150%.
+- General properties expanded by default; Layout and spacing and Advanced CSS and HTML collapsed by default. Group state persists while switching selections.

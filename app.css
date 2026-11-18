@@ -9,3 +9,10 @@
 .tree-row.drop-after{box-shadow:inset 0 -3px #2563eb;background:#eff6ff}
 .tree-row.drop-inside{outline:2px dashed #2563eb;outline-offset:-2px;background:#dbeafe}
 .drag-help{background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:8px;margin-bottom:10px}
+
+/* v0.5: navigation, zoom, collapsible property groups */
+.breadcrumbs{display:flex;gap:5px;align-items:center;overflow-x:auto;white-space:nowrap;padding:8px 16px;background:#fff;border-bottom:1px solid #d9e1eb;min-height:43px}
+.crumb{font:11px Consolas,monospace;padding:5px 7px;white-space:nowrap}.crumb.active{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}.crumb-separator{color:#94a3b8}
+.preview-wrap{overflow:auto;position:relative}.preview-wrap #preview-stage{width:100%;height:100%;transform-origin:top left;min-width:0}#preview-stage iframe{display:block}
+.selection-tools{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0 14px}.selection-tools button{font-size:12px}
+.property-section{border:1px solid #dbe3ed;border-radius:8px;overflow:hidden;background:#fff}.property-section>summary{cursor:pointer;padding:10px 12px;background:#f5f8fc;font-weight:700;color:#334155;user-select:none}.property-section[open]>summary{border-bottom:1px solid #dbe3ed}.property-section-content{display:grid;gap:10px;padding:12px}
